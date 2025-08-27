@@ -245,10 +245,7 @@ class VenueManagementSystem:
             # Chat input
             user_input = st.chat_input("Ask about venues, policies, pricing...")
             
-            # Handle suggestion selection
-            if hasattr(st.session_state, 'selected_query'):
-                user_input = st.session_state.selected_query
-                del st.session_state.selected_query
+
             
             # Process input
             if user_input:
@@ -267,11 +264,11 @@ class VenueManagementSystem:
                 
                 st.rerun()
             
-            # Suggestion questions with hide option
+            # Hidden sample questions for reference
             show_suggestions = st.checkbox("Show Sample Questions", value=False)
             
             if show_suggestions:
-                st.markdown("### SAMPLE QUESTIONS")
+                st.markdown("### SAMPLE QUESTIONS (Copy Text)")
                 suggestions = [
                     "What are the catering policies and dietary accommodation options for events?",
                     "Compare the Grand Ballroom versus Conference Room A in terms of pricing, capacity, and included amenities",
@@ -279,8 +276,7 @@ class VenueManagementSystem:
                 ]
                 
                 for i, suggestion in enumerate(suggestions):
-                    if st.button(f"Q{i+1}", key=f"suggest_{i}", help=suggestion, use_container_width=True):
-                        st.session_state.selected_query = suggestion
+                    st.text_area(f"Q{i+1}:", value=suggestion, height=60, key=f"suggest_{i}")
             
             st.markdown("---")
             
