@@ -1,0 +1,9 @@
+pandas
+numpy
+pyyaml
+boto3
+opensearch-py
+botocore
+awscli
+retrying
+plotly
