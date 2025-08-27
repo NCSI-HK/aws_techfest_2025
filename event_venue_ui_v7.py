@@ -102,13 +102,7 @@ st.markdown("""
         border: 1px solid #e9ecef;
     }
     
-    .calendar-container {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 1rem 0;
-    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -232,86 +226,137 @@ class VenueManagementSystem:
                         st.session_state.selected_query = suggestion
             
             st.markdown("---")
-            st.markdown("### INFRASTRUCTURE")
             
-            st.session_state.show_infrastructure = st.checkbox("Show AWS Details", 
-                                                             value=st.session_state.show_infrastructure)
+            # Infrastructure section with hide option
+            show_infrastructure_panel = st.checkbox("Show Infrastructure & Status", value=False)
             
-            # System metrics
-            st.markdown("### SYSTEM STATUS")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"""
-                <div class="metric-container">
-                    <div class="metric-value">{'🟢' if self.connected else '🔴'}</div>
-                    <div class="metric-label">AGENT</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown(f"""
-                <div class="metric-container">
-                    <div class="metric-value">{len(st.session_state.execution_log)}</div>
-                    <div class="metric-label">OPERATIONS</div>
-                </div>
-                """, unsafe_allow_html=True)
+            if show_infrastructure_panel:
+                st.markdown("### INFRASTRUCTURE")
+                st.session_state.show_infrastructure = st.checkbox("Show AWS Details", 
+                                                                 value=st.session_state.show_infrastructure)
+                
+                # System metrics
+                st.markdown("### SYSTEM STATUS")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"""
+                    <div class="metric-container">
+                        <div class="metric-value">{'🟢' if self.connected else '🔴'}</div>
+                        <div class="metric-label">AGENT</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown(f"""
+                    <div class="metric-container">
+                        <div class="metric-value">{len(st.session_state.execution_log)}</div>
+                        <div class="metric-label">OPERATIONS</div>
+                    </div>
+                    """, unsafe_allow_html=True)
     
     def render_calendar(self):
-        st.markdown("### BOOKING CALENDAR")
+        st.markdown("### 📅 BOOKING CALENDAR")
         
         # Calendar controls
         col1, col2, col3 = st.columns([1, 2, 1])
         
         with col2:
             current_date = datetime.now()
-            selected_month = st.selectbox("Month", 
+            selected_month = st.selectbox("📅 Month", 
                                         options=list(range(1, 13)),
                                         index=current_date.month - 1,
                                         format_func=lambda x: calendar.month_name[x])
-            selected_year = st.selectbox("Year", 
+            selected_year = st.selectbox("📆 Year", 
                                        options=[2024, 2025, 2026],
                                        index=1)
         
-        # Generate calendar
+        # Generate calendar with enhanced styling
         cal = calendar.monthcalendar(selected_year, selected_month)
         
-        st.markdown('<div class="calendar-container">', unsafe_allow_html=True)
+        # Calendar with better visual design
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        ">
+            <h3 style="text-align: center; margin-bottom: 1rem; color: white;">
+                {calendar.month_name[selected_month]} {selected_year}
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Calendar header
-        days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        # Calendar header with better styling
+        days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
         cols = st.columns(7)
         for i, day in enumerate(days):
             with cols[i]:
-                st.markdown(f"**{day}**")
+                st.markdown(f"""
+                <div style="
+                    background: #f7fafc;
+                    padding: 0.5rem;
+                    text-align: center;
+                    font-weight: 600;
+                    border: 1px solid #e2e8f0;
+                    color: #1a365d;
+                ">{day}</div>
+                """, unsafe_allow_html=True)
         
-        # Calendar days
+        # Calendar days with enhanced styling
         for week in cal:
             cols = st.columns(7)
             for i, day in enumerate(week):
                 with cols[i]:
                     if day == 0:
-                        st.markdown("")
+                        st.markdown('<div style="height: 60px;"></div>', unsafe_allow_html=True)
                     else:
                         date_str = f"{selected_year}-{selected_month:02d}-{day:02d}"
                         is_booked = date_str in st.session_state.bookings
+                        is_today = date_str == datetime.now().strftime('%Y-%m-%d')
+                        
+                        # Enhanced button styling
+                        button_style = ""
+                        if is_booked:
+                            button_style = "background: #1a365d; color: white; border: 2px solid #1a365d;"
+                        elif is_today:
+                            button_style = "background: #718096; color: white; border: 2px solid #718096;"
+                        else:
+                            button_style = "background: white; color: #1a365d; border: 1px solid #e2e8f0;"
                         
                         if st.button(str(day), key=f"cal_{date_str}"):
                             st.session_state.selected_date = date_str
                         
                         if is_booked:
-                            st.markdown(f"<small>📅 {st.session_state.bookings[date_str][:15]}...</small>", 
-                                      unsafe_allow_html=True)
+                            st.markdown(f"""
+                            <div style="
+                                font-size: 0.7rem;
+                                color: #1a365d;
+                                text-align: center;
+                                padding: 2px;
+                                background: #e3f2fd;
+                                border-radius: 4px;
+                                margin-top: 2px;
+                            ">📅 {st.session_state.bookings[date_str].split(' - ')[0]}</div>
+                            """, unsafe_allow_html=True)
         
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Selected date info
+        # Selected date info with better styling
         if st.session_state.selected_date:
-            st.markdown(f"**Selected Date:** {st.session_state.selected_date}")
-            if st.session_state.selected_date in st.session_state.bookings:
-                st.markdown(f"**Booking:** {st.session_state.bookings[st.session_state.selected_date]}")
-            else:
-                st.markdown("**Status:** Available")
+            st.markdown(f"""
+            <div style="
+                background: #f7fafc;
+                border-left: 4px solid #1a365d;
+                padding: 1rem;
+                margin: 1rem 0;
+                border-radius: 4px;
+            ">
+                <strong>📅 Selected Date:</strong> {st.session_state.selected_date}<br>
+                <strong>📋 Status:</strong> {'🔴 ' + st.session_state.bookings[st.session_state.selected_date] if st.session_state.selected_date in st.session_state.bookings else '🟢 Available'}
+            </div>
+            """, unsafe_allow_html=True)
     
     def render_dashboard(self):
         st.markdown("## SYSTEM DASHBOARD")
@@ -390,6 +435,32 @@ class VenueManagementSystem:
             
             st.markdown("**CPU Usage**: 45%")
             st.progress(0.45)
+        
+        # Revenue trend section
+        st.markdown("---")
+        
+        # Revenue trend chart
+        dates = [datetime.now() - timedelta(days=x) for x in range(30, 0, -1)]
+        revenue = [2000 + (i * 100) + (i % 7 * 500) for i in range(30)]
+        
+        fig = go.Figure(data=go.Scatter(
+            x=dates, 
+            y=revenue, 
+            line=dict(color='#1a365d', width=3),
+            fill='tonexty',
+            fillcolor='rgba(26, 54, 93, 0.1)'
+        ))
+        fig.update_layout(
+            title="30-DAY REVENUE TREND", 
+            font=dict(family="JetBrains Mono"),
+            plot_bgcolor='#f7fafc', 
+            paper_bgcolor='white', 
+            height=300,
+            showlegend=False,
+            xaxis_title="Date",
+            yaxis_title="Revenue ($)"
+        )
+        st.plotly_chart(fig, use_container_width=True)
         
         # Calendar section
         st.markdown("---")
