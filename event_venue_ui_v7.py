@@ -6,6 +6,7 @@ import yaml
 import os
 import plotly.graph_objects as go
 import calendar
+import random
 from datetime import datetime, timedelta
 
 st.set_page_config(
@@ -101,8 +102,6 @@ st.markdown("""
         background: #f7fafc;
         border: 1px solid #e9ecef;
     }
-    
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -110,6 +109,7 @@ class VenueManagementSystem:
     def __init__(self):
         self.setup_aws()
         self.init_session_state()
+        self.init_dynamic_data()
     
     def setup_aws(self):
         try:
@@ -147,13 +147,70 @@ class VenueManagementSystem:
             st.session_state.messages = []
         if 'selected_date' not in st.session_state:
             st.session_state.selected_date = None
+    
+    def init_dynamic_data(self):
+        """Initialize dynamic venue, booking, and revenue data"""
+        # Venue data
+        self.venues = [
+            {'name': 'Grand Ballroom', 'capacity': 200, 'price': 2500, 'utilization': random.randint(80, 95)},
+            {'name': 'Conference Room A', 'capacity': 50, 'price': 800, 'utilization': random.randint(65, 85)},
+            {'name': 'Garden Terrace', 'capacity': 100, 'price': 1200, 'utilization': random.randint(60, 80)},
+            {'name': 'Executive Board', 'capacity': 20, 'price': 600, 'utilization': random.randint(85, 98)}
+        ]
+        
+        # Generate dynamic bookings
         if 'bookings' not in st.session_state:
-            st.session_state.bookings = {
-                '2025-03-05': 'Conference Room A - ABC Corp',
-                '2025-03-12': 'Grand Ballroom - XYZ Event',
-                '2025-03-18': 'Garden Terrace - Wedding',
-                '2025-03-25': 'Executive Board - Board Meeting'
-            }
+            companies = ['ABC Corp', 'XYZ Ltd', 'TechStart Inc', 'Global Events', 'Innovation Hub', 'Business Solutions']
+            event_types = ['Meeting', 'Conference', 'Workshop', 'Presentation', 'Training', 'Seminar']
+            
+            bookings = {}
+            base_date = datetime.now()
+            
+            for i in range(15):  # Generate 15 random bookings
+                days_offset = random.randint(1, 60)
+                booking_date = (base_date + timedelta(days=days_offset)).strftime('%Y-%m-%d')
+                
+                if booking_date not in bookings:  # Avoid double bookings
+                    venue = random.choice(self.venues)
+                    company = random.choice(companies)
+                    event_type = random.choice(event_types)
+                    bookings[booking_date] = f"{venue['name']} - {company} {event_type}"
+            
+            st.session_state.bookings = bookings
+        
+        # Generate dynamic revenue data
+        if 'revenue_data' not in st.session_state:
+            base_revenue = 2000
+            revenue_data = []
+            dates = []
+            
+            for i in range(30):
+                date = datetime.now() - timedelta(days=29-i)
+                dates.append(date)
+                
+                # Generate realistic revenue with trends and variations
+                trend = i * 50  # Upward trend
+                seasonal = 500 * (1 + 0.3 * (i % 7 == 5 or i % 7 == 6))  # Weekend boost
+                random_var = random.randint(-200, 300)
+                daily_revenue = base_revenue + trend + seasonal + random_var
+                
+                revenue_data.append(max(daily_revenue, 1000))  # Minimum 1000
+            
+            st.session_state.revenue_data = {'dates': dates, 'revenue': revenue_data}
+        
+        # System metrics
+        self.system_metrics = {
+            'venues_available': len(self.venues),
+            'uptime': round(random.uniform(98.0, 99.9), 1),
+            'bookings_month': len([d for d in st.session_state.bookings.keys() 
+                                 if datetime.strptime(d, '%Y-%m-%d').month == datetime.now().month]),
+            'revenue_ytd': f"${random.randint(20, 35)/10:.1f}M",
+            'response_time': round(random.uniform(0.5, 1.2), 1),
+            'availability': round(random.uniform(99.0, 99.9), 1),
+            'throughput': random.randint(140, 180),
+            'memory_usage': random.randint(60, 75),
+            'cpu_usage': random.randint(35, 55)
+        }
     
     def render_header(self):
         st.markdown("""
@@ -271,10 +328,10 @@ class VenueManagementSystem:
                                        options=[2024, 2025, 2026],
                                        index=1)
         
-        # Generate calendar with enhanced styling
+        # Generate calendar
         cal = calendar.monthcalendar(selected_year, selected_month)
         
-        # Calendar with better visual design
+        # Calendar header
         st.markdown(f"""
         <div style="
             background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%);
@@ -290,7 +347,7 @@ class VenueManagementSystem:
         </div>
         """, unsafe_allow_html=True)
         
-        # Calendar header with better styling
+        # Calendar header days
         days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
         cols = st.columns(7)
         for i, day in enumerate(days):
@@ -298,52 +355,57 @@ class VenueManagementSystem:
                 st.markdown(f"""
                 <div style="
                     background: #f7fafc;
-                    padding: 0.5rem;
+                    padding: 0.8rem;
                     text-align: center;
                     font-weight: 600;
                     border: 1px solid #e2e8f0;
                     color: #1a365d;
+                    height: 40px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
                 ">{day}</div>
                 """, unsafe_allow_html=True)
         
-        # Calendar days with enhanced styling
+        # Calendar days with structured layout
         for week in cal:
             cols = st.columns(7)
             for i, day in enumerate(week):
                 with cols[i]:
                     if day == 0:
-                        st.markdown('<div style="height: 60px;"></div>', unsafe_allow_html=True)
+                        st.markdown('<div style="height: 80px; border: 1px solid #f0f0f0;"></div>', unsafe_allow_html=True)
                     else:
                         date_str = f"{selected_year}-{selected_month:02d}-{day:02d}"
                         is_booked = date_str in st.session_state.bookings
                         is_today = date_str == datetime.now().strftime('%Y-%m-%d')
                         
-                        # Enhanced button styling
-                        button_style = ""
-                        if is_booked:
-                            button_style = "background: #1a365d; color: white; border: 2px solid #1a365d;"
-                        elif is_today:
-                            button_style = "background: #718096; color: white; border: 2px solid #718096;"
-                        else:
-                            button_style = "background: white; color: #1a365d; border: 1px solid #e2e8f0;"
+                        # Structured calendar cell
+                        cell_color = "#1a365d" if is_booked else "#718096" if is_today else "#f7fafc"
+                        text_color = "white" if (is_booked or is_today) else "#1a365d"
                         
-                        if st.button(str(day), key=f"cal_{date_str}"):
+                        st.markdown(f"""
+                        <div style="
+                            height: 80px;
+                            border: 1px solid #e2e8f0;
+                            background: {cell_color};
+                            color: {text_color};
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                        " onclick="document.querySelector('[data-testid=\\"cal_{date_str}\\"]').click()">
+                            <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 4px;">{day}</div>
+                            {f'<div style="font-size: 0.6rem; text-align: center; opacity: 0.9;">📅 {st.session_state.bookings[date_str].split(" - ")[0][:8]}</div>' if is_booked else ''}
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Hidden button for functionality
+                        if st.button(" ", key=f"cal_{date_str}", help=f"Select {date_str}"):
                             st.session_state.selected_date = date_str
-                        
-                        if is_booked:
-                            st.markdown(f"""
-                            <div style="
-                                font-size: 0.7rem;
-                                color: #1a365d;
-                                text-align: center;
-                                padding: 2px;
-                                background: #e3f2fd;
-                                border-radius: 4px;
-                                margin-top: 2px;
-                            ">📅 {st.session_state.bookings[date_str].split(' - ')[0]}</div>
-                            """, unsafe_allow_html=True)
         
-        # Selected date info with better styling
+        # Selected date info
         if st.session_state.selected_date:
             st.markdown(f"""
             <div style="
@@ -354,44 +416,44 @@ class VenueManagementSystem:
                 border-radius: 4px;
             ">
                 <strong>📅 Selected Date:</strong> {st.session_state.selected_date}<br>
-                <strong>📋 Status:</strong> {'🔴 ' + st.session_state.bookings[st.session_state.selected_date] if st.session_state.selected_date in st.session_state.bookings else '🟢 Available'}
+                <strong>📋 Status:</strong> {'🔴 Booked - ' + st.session_state.bookings[st.session_state.selected_date] if st.session_state.selected_date in st.session_state.bookings else '🟢 Available for booking'}
             </div>
             """, unsafe_allow_html=True)
     
     def render_dashboard(self):
         st.markdown("## SYSTEM DASHBOARD")
         
-        # Top metrics row
+        # Dynamic metrics row
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.markdown("""
+            st.markdown(f"""
             <div class="metric-container">
-                <div class="metric-value">4</div>
+                <div class="metric-value">{self.system_metrics['venues_available']}</div>
                 <div class="metric-label">VENUES AVAILABLE</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col2:
-            st.markdown("""
+            st.markdown(f"""
             <div class="metric-container">
-                <div class="metric-value">98.5%</div>
+                <div class="metric-value">{self.system_metrics['uptime']}%</div>
                 <div class="metric-label">SYSTEM UPTIME</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col3:
-            st.markdown("""
+            st.markdown(f"""
             <div class="metric-container">
-                <div class="metric-value">156</div>
+                <div class="metric-value">{self.system_metrics['bookings_month']}</div>
                 <div class="metric-label">BOOKINGS THIS MONTH</div>
             </div>
             """, unsafe_allow_html=True)
         
         with col4:
-            st.markdown("""
+            st.markdown(f"""
             <div class="metric-container">
-                <div class="metric-value">$2.3M</div>
+                <div class="metric-value">{self.system_metrics['revenue_ytd']}</div>
                 <div class="metric-label">REVENUE YTD</div>
             </div>
             """, unsafe_allow_html=True)
@@ -402,11 +464,11 @@ class VenueManagementSystem:
         col1, col2 = st.columns([3, 2])
         
         with col1:
-            # Venue utilization chart
-            venues = ['Grand Ballroom', 'Conference A', 'Garden Terrace', 'Executive Board']
-            utilization = [85, 72, 68, 91]
+            # Dynamic venue utilization chart
+            venue_names = [v['name'] for v in self.venues]
+            utilization = [v['utilization'] for v in self.venues]
             
-            fig = go.Figure(data=[go.Bar(x=venues, y=utilization, marker_color='#1a365d')])
+            fig = go.Figure(data=[go.Bar(x=venue_names, y=utilization, marker_color='#1a365d')])
             fig.update_layout(
                 title="VENUE UTILIZATION (%)", 
                 font=dict(family="JetBrains Mono"),
@@ -420,32 +482,31 @@ class VenueManagementSystem:
         with col2:
             st.markdown("### SYSTEM STATUS")
             
-            # System performance metrics
-            st.markdown("**Response Time**: 0.8s")
-            st.progress(0.92)
+            # Dynamic system performance metrics
+            st.markdown(f"**Response Time**: {self.system_metrics['response_time']}s")
+            st.progress(min(self.system_metrics['response_time']/2, 1.0))
             
-            st.markdown("**Availability**: 99.2%")
-            st.progress(0.992)
+            st.markdown(f"**Availability**: {self.system_metrics['availability']}%")
+            st.progress(self.system_metrics['availability']/100)
             
-            st.markdown("**Throughput**: 156 req/min")
-            st.progress(0.78)
+            st.markdown(f"**Throughput**: {self.system_metrics['throughput']} req/min")
+            st.progress(self.system_metrics['throughput']/200)
             
-            st.markdown("**Memory Usage**: 68%")
-            st.progress(0.68)
+            st.markdown(f"**Memory Usage**: {self.system_metrics['memory_usage']}%")
+            st.progress(self.system_metrics['memory_usage']/100)
             
-            st.markdown("**CPU Usage**: 45%")
-            st.progress(0.45)
+            st.markdown(f"**CPU Usage**: {self.system_metrics['cpu_usage']}%")
+            st.progress(self.system_metrics['cpu_usage']/100)
         
         # Revenue trend section
         st.markdown("---")
         
-        # Revenue trend chart
-        dates = [datetime.now() - timedelta(days=x) for x in range(30, 0, -1)]
-        revenue = [2000 + (i * 100) + (i % 7 * 500) for i in range(30)]
+        # Dynamic revenue trend chart
+        revenue_data = st.session_state.revenue_data
         
         fig = go.Figure(data=go.Scatter(
-            x=dates, 
-            y=revenue, 
+            x=revenue_data['dates'], 
+            y=revenue_data['revenue'], 
             line=dict(color='#1a365d', width=3),
             fill='tonexty',
             fillcolor='rgba(26, 54, 93, 0.1)'
