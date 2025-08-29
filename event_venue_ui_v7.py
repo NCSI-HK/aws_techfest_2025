@@ -103,6 +103,27 @@ st.markdown("""
         background: #f7fafc;
         border: 1px solid #e9ecef;
     }
+    
+    /* Calendar button styling */
+    div[data-testid*="cal_"] button {
+        width: 100% !important;
+        height: 80px !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        color: transparent !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        z-index: 10 !important;
+    }
+    
+    .calendar-cell {
+        position: relative !important;
+        width: 100% !important;
+        height: 80px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -114,17 +135,15 @@ class VenueManagementSystem:
     
     def setup_aws(self):
         try:
-            with open('config.yaml') as f:
-                config = yaml.safe_load(f)
-            
+            # Use Streamlit secrets for AWS credentials
             os.environ.update({
-                'AWS_ACCESS_KEY_ID': config['aws']['access_key_id'],
-                'AWS_SECRET_ACCESS_KEY': config['aws']['secret_access_key'],
-                'AWS_DEFAULT_REGION': config['aws']['region']
+                'AWS_ACCESS_KEY_ID': st.secrets['aws']['access_key_id'],
+                'AWS_SECRET_ACCESS_KEY': st.secrets['aws']['secret_access_key'],
+                'AWS_DEFAULT_REGION': st.secrets['aws']['region']
             })
             
-            self.bedrock = boto3.client('bedrock-agent-runtime', region_name=config['aws']['region'])
-            self.dynamodb = boto3.resource('dynamodb', region_name=config['aws']['region'])
+            self.bedrock = boto3.client('bedrock-agent-runtime', region_name=st.secrets['aws']['region'])
+            self.dynamodb = boto3.resource('dynamodb', region_name=st.secrets['aws']['region'])
             
             with open('created_resources_v4.json') as f:
                 resources = json.load(f)
@@ -192,8 +211,9 @@ class VenueManagementSystem:
             st.warning(f"Could not load from DynamoDB: {e}. Using default data.")
             self.init_default_data()
     
+    @st.cache_data(ttl=300)  # Cache for 5 minutes
     def load_venues_from_db(self):
-        """Load venues from DynamoDB"""
+        """Load venues from DynamoDB with caching"""
         try:
             table = self.dynamodb.Table('venue_management_venues')
             response = table.scan()
@@ -217,8 +237,9 @@ class VenueManagementSystem:
         except Exception:
             return self.get_default_venues()
     
+    @st.cache_data(ttl=60)  # Cache for 1 minute
     def load_bookings_from_db(self):
-        """Load bookings from actual agent DynamoDB table"""
+        """Load bookings from actual agent DynamoDB table with caching"""
         try:
             # Use the actual agent table from resources
             table = self.dynamodb.Table(self.resources['dynamodb_table'])
@@ -236,8 +257,9 @@ class VenueManagementSystem:
         except Exception:
             return {'2025-03-05': 'Conference Room A - ABC Corp Meeting'}
     
+    @st.cache_data(ttl=300)  # Cache for 5 minutes
     def load_revenue_from_db(self):
-        """Load revenue data from DynamoDB"""
+        """Load revenue data from DynamoDB with caching"""
         try:
             table = self.dynamodb.Table('venue_management_revenue')
             response = table.scan()
@@ -499,7 +521,7 @@ class VenueManagementSystem:
                         text_color = "white" if (is_booked or is_today) else "#1a365d"
                         
                         st.markdown(f"""
-                        <div style="
+                        <div class="calendar-cell" style="
                             height: 80px;
                             border: 1px solid #e2e8f0;
                             background: {cell_color};
@@ -510,7 +532,8 @@ class VenueManagementSystem:
                             justify-content: center;
                             cursor: pointer;
                             transition: all 0.2s;
-                        " onclick="document.querySelector('[data-testid=\\"cal_{date_str}\\"]').click()">
+                            position: relative;
+                        ">
                             <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 4px;">{day}</div>
                             {f'<div style="font-size: 0.6rem; text-align: center; opacity: 0.9;">📅 {st.session_state.bookings[date_str].split(" - ")[0][:8]}</div>' if is_booked else ''}
                         </div>
