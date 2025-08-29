@@ -104,8 +104,8 @@ st.markdown("""
         border: 1px solid #e9ecef;
     }
     
-    /* Calendar button styling */
-    .stButton > button {
+    /* Calendar button styling - only for original calendar */
+    .calendar-cell + div .stButton > button {
         width: 100% !important;
         height: 80px !important;
         padding: 0 !important;
@@ -126,7 +126,7 @@ st.markdown("""
         height: 80px !important;
     }
     
-    .calendar-cell .stButton {
+    .calendar-cell + div {
         position: absolute !important;
         top: 0 !important;
         left: 0 !important;
@@ -508,7 +508,7 @@ class VenueManagementSystem:
                 st.markdown(f"**{day}**")
         
         # Calendar grid
-        for week in cal:
+        for week_idx, week in enumerate(cal):
             cols = st.columns(7)
             for i, day in enumerate(week):
                 with cols[i]:
@@ -517,9 +517,10 @@ class VenueManagementSystem:
                         is_booked = date_str in st.session_state.bookings
                         
                         button_type = "primary" if is_booked else "secondary"
-                        if st.button(f"{day}", key=f"card_{date_str}", type=button_type, use_container_width=True):
+                        if st.button(f"{day}", key=f"card_{week_idx}_{i}_{day}", type=button_type, use_container_width=True):
                             st.session_state.selected_date = date_str
-                            st.rerun()
+                    else:
+                        st.write("")  # Empty cell for alignment
         
         # Selected date info
         if hasattr(st.session_state, 'selected_date') and st.session_state.selected_date:
@@ -922,14 +923,34 @@ class VenueManagementSystem:
     def refresh_data_from_db(self):
         """Refresh data from DynamoDB after booking operations"""
         try:
-            # Only refresh bookings, not venues (to reduce DB calls)
-            st.session_state.bookings = self.load_bookings_from_db()
+            # Clear cache and reload bookings
+            if 'bookings' in st.session_state:
+                del st.session_state['bookings']
             
-            # Update metrics without recalculating venues
+            # Force reload from DB by calling without cache
+            st.session_state.bookings = self.load_bookings_from_db_no_cache()
+            
+            # Update metrics
             self.system_metrics['bookings_month'] = len([d for d in st.session_state.bookings.keys() 
                                                        if datetime.strptime(d, '%Y-%m-%d').month == datetime.now().month])
         except Exception:
             pass  # Continue with cached data
+    
+    def load_bookings_from_db_no_cache(self):
+        """Load bookings without cache for real-time updates"""
+        try:
+            table = self.dynamodb.Table(self.resources['dynamodb_table'])
+            response = table.scan()
+            
+            bookings = {}
+            for item in response['Items']:
+                date_key = item.get('event_date', '')
+                if date_key:
+                    bookings[date_key] = f"{item.get('venue_name', '')} - {item.get('client_name', '')} {item.get('event_type', '')}"
+            
+            return bookings
+        except Exception:
+            return st.session_state.get('bookings', {})
     
     def run(self):
         self.render_header()
