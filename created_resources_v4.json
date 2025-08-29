@@ -1,0 +1,13 @@
+{
+  "agent_id": "HCBERUXRYP",
+  "knowledge_base_id": "LC7QB6Y94X",
+  "lambda_function_arn": "arn:aws:lambda:us-east-1:686631002511:function:venue-booking-68663100",
+  "dynamodb_table": "venue-cs-68663100-1756254918-bookings",
+  "s3_bucket": "venue-kb-us-east-1-686631002511",
+  "iam_roles": [
+    "venue-cs-68663100-1756254918-lambda",
+    "BedrockAgent-venue-cs-68663100-1756254918"
+  ],
+  "iam_policies": [],
+  "opensearch_collection": null
+}

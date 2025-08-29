@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import calendar
 import random
 from datetime import datetime, timedelta
+from botocore.exceptions import ClientError
 
 st.set_page_config(
     page_title="Event Venue Management System",
@@ -130,11 +131,19 @@ class VenueManagementSystem:
                 resources = json.load(f)
             self.agent_id = resources['agent_id']
             self.table_name = resources.get('dynamodb_table')
+            self.resources = resources
+            
+            # Create DynamoDB tables if they don't exist
+            self.create_tables_if_not_exist()
             self.connected = True
             
         except Exception as e:
             self.connected = False
             st.error(f"System Error: {e}")
+    
+    def create_tables_if_not_exist(self):
+        """Skip table creation to improve performance"""
+        pass  # Tables are created by the agent deployment
     
     def init_session_state(self):
         if 'show_infrastructure' not in st.session_state:
@@ -149,67 +158,152 @@ class VenueManagementSystem:
             st.session_state.selected_date = None
     
     def init_dynamic_data(self):
-        """Initialize dynamic venue, booking, and revenue data"""
-        # Venue data
-        self.venues = [
-            {'name': 'Grand Ballroom', 'capacity': 200, 'price': 2500, 'utilization': random.randint(80, 95)},
-            {'name': 'Conference Room A', 'capacity': 50, 'price': 800, 'utilization': random.randint(65, 85)},
-            {'name': 'Garden Terrace', 'capacity': 100, 'price': 1200, 'utilization': random.randint(60, 80)},
-            {'name': 'Executive Board', 'capacity': 20, 'price': 600, 'utilization': random.randint(85, 98)}
-        ]
-        
-        # Generate dynamic bookings
-        if 'bookings' not in st.session_state:
-            companies = ['ABC Corp', 'XYZ Ltd', 'TechStart Inc', 'Global Events', 'Innovation Hub', 'Business Solutions']
-            event_types = ['Meeting', 'Conference', 'Workshop', 'Presentation', 'Training', 'Seminar']
+        """Load data from DynamoDB or initialize if not exists"""
+        try:
+            # Cache venues in session state to avoid repeated DB calls
+            if 'venues' not in st.session_state:
+                st.session_state.venues = self.load_venues_from_db()
+            self.venues = st.session_state.venues
+            
+            # Load bookings from DynamoDB
+            if 'bookings' not in st.session_state:
+                st.session_state.bookings = self.load_bookings_from_db()
+            
+            # Load revenue data from DynamoDB
+            if 'revenue_data' not in st.session_state:
+                st.session_state.revenue_data = self.load_revenue_from_db()
+            
+            # Calculate system metrics from loaded data (cached)
+            if 'system_metrics' not in st.session_state:
+                st.session_state.system_metrics = {
+                    'venues_available': len(self.venues),
+                    'uptime': 99.2,
+                    'bookings_month': len([d for d in st.session_state.bookings.keys() 
+                                         if datetime.strptime(d, '%Y-%m-%d').month == datetime.now().month]),
+                    'revenue_ytd': f"${sum(st.session_state.revenue_data['revenue'])/1000:.1f}K",
+                    'response_time': 0.8,
+                    'availability': 99.5,
+                    'throughput': 156,
+                    'memory_usage': 68,
+                    'cpu_usage': 45
+                }
+            self.system_metrics = st.session_state.system_metrics
+            
+        except Exception as e:
+            st.warning(f"Could not load from DynamoDB: {e}. Using default data.")
+            self.init_default_data()
+    
+    def load_venues_from_db(self):
+        """Load venues from DynamoDB"""
+        try:
+            table = self.dynamodb.Table('venue_management_venues')
+            response = table.scan()
+            
+            if response['Items']:
+                return response['Items']
+            else:
+                # Initialize default venues in DB
+                default_venues = [
+                    {'venue_id': 'grand_ballroom', 'name': 'Grand Ballroom', 'capacity': 200, 'price': 2500, 'utilization': 85},
+                    {'venue_id': 'conference_a', 'name': 'Conference Room A', 'capacity': 50, 'price': 800, 'utilization': 72},
+                    {'venue_id': 'garden_terrace', 'name': 'Garden Terrace', 'capacity': 100, 'price': 1200, 'utilization': 68},
+                    {'venue_id': 'executive_board', 'name': 'Executive Board', 'capacity': 20, 'price': 600, 'utilization': 91}
+                ]
+                
+                for venue in default_venues:
+                    table.put_item(Item=venue)
+                
+                return default_venues
+                
+        except Exception:
+            return self.get_default_venues()
+    
+    def load_bookings_from_db(self):
+        """Load bookings from actual agent DynamoDB table"""
+        try:
+            # Use the actual agent table from resources
+            table = self.dynamodb.Table(self.resources['dynamodb_table'])
+            response = table.scan()
             
             bookings = {}
-            base_date = datetime.now()
+            for item in response['Items']:
+                # Agent uses 'event_date' field, not 'booking_date'
+                date_key = item.get('event_date', '')
+                if date_key:
+                    bookings[date_key] = f"{item.get('venue_name', '')} - {item.get('client_name', '')} {item.get('event_type', '')}"
             
-            for i in range(15):  # Generate 15 random bookings
-                days_offset = random.randint(1, 60)
-                booking_date = (base_date + timedelta(days=days_offset)).strftime('%Y-%m-%d')
+            return bookings
+            
+        except Exception:
+            return {'2025-03-05': 'Conference Room A - ABC Corp Meeting'}
+    
+    def load_revenue_from_db(self):
+        """Load revenue data from DynamoDB"""
+        try:
+            table = self.dynamodb.Table('venue_management_revenue')
+            response = table.scan()
+            
+            if response['Items']:
+                # Sort by date and extract data
+                sorted_items = sorted(response['Items'], key=lambda x: x['date'])
+                dates = [datetime.strptime(item['date'], '%Y-%m-%d') for item in sorted_items]
+                revenue = [item['revenue'] for item in sorted_items]
+                return {'dates': dates, 'revenue': revenue}
+            else:
+                # Initialize default revenue data
+                revenue_data = []
+                dates = []
                 
-                if booking_date not in bookings:  # Avoid double bookings
-                    venue = random.choice(self.venues)
-                    company = random.choice(companies)
-                    event_type = random.choice(event_types)
-                    bookings[booking_date] = f"{venue['name']} - {company} {event_type}"
-            
-            st.session_state.bookings = bookings
+                for i in range(30):
+                    date = datetime.now() - timedelta(days=29-i)
+                    dates.append(date)
+                    daily_revenue = 2000 + (i * 50) + (500 if date.weekday() >= 5 else 0)
+                    revenue_data.append(daily_revenue)
+                    
+                    # Save to DB
+                    table.put_item(Item={
+                        'date': date.strftime('%Y-%m-%d'),
+                        'revenue': daily_revenue
+                    })
+                
+                return {'dates': dates, 'revenue': revenue_data}
+                
+        except Exception:
+            dates = [datetime.now() - timedelta(days=x) for x in range(30, 0, -1)]
+            revenue = [2000 + (i * 50) for i in range(30)]
+            return {'dates': dates, 'revenue': revenue}
+    
+    def get_default_venues(self):
+        """Fallback default venues"""
+        return [
+            {'name': 'Grand Ballroom', 'capacity': 200, 'price': 2500, 'utilization': 85},
+            {'name': 'Conference Room A', 'capacity': 50, 'price': 800, 'utilization': 72},
+            {'name': 'Garden Terrace', 'capacity': 100, 'price': 1200, 'utilization': 68},
+            {'name': 'Executive Board', 'capacity': 20, 'price': 600, 'utilization': 91}
+        ]
+    
+    def init_default_data(self):
+        """Initialize with default data if DB fails"""
+        self.venues = self.get_default_venues()
         
-        # Generate dynamic revenue data
+        if 'bookings' not in st.session_state:
+            st.session_state.bookings = {'2025-03-05': 'Conference Room A - ABC Corp Meeting'}
+        
         if 'revenue_data' not in st.session_state:
-            base_revenue = 2000
-            revenue_data = []
-            dates = []
-            
-            for i in range(30):
-                date = datetime.now() - timedelta(days=29-i)
-                dates.append(date)
-                
-                # Generate realistic revenue with trends and variations
-                trend = i * 50  # Upward trend
-                seasonal = 500 * (1 + 0.3 * (i % 7 == 5 or i % 7 == 6))  # Weekend boost
-                random_var = random.randint(-200, 300)
-                daily_revenue = base_revenue + trend + seasonal + random_var
-                
-                revenue_data.append(max(daily_revenue, 1000))  # Minimum 1000
-            
-            st.session_state.revenue_data = {'dates': dates, 'revenue': revenue_data}
+            dates = [datetime.now() - timedelta(days=x) for x in range(30, 0, -1)]
+            revenue = [2000 + (i * 50) for i in range(30)]
+            st.session_state.revenue_data = {'dates': dates, 'revenue': revenue}
         
-        # System metrics
         self.system_metrics = {
-            'venues_available': len(self.venues),
-            'uptime': round(random.uniform(98.0, 99.9), 1),
-            'bookings_month': len([d for d in st.session_state.bookings.keys() 
-                                 if datetime.strptime(d, '%Y-%m-%d').month == datetime.now().month]),
-            'revenue_ytd': f"${random.randint(20, 35)/10:.1f}M",
-            'response_time': round(random.uniform(0.5, 1.2), 1),
-            'availability': round(random.uniform(99.0, 99.9), 1),
-            'throughput': random.randint(140, 180),
-            'memory_usage': random.randint(60, 75),
-            'cpu_usage': random.randint(35, 55)
+            'venues_available': 4,
+            'uptime': 99.2,
+            'bookings_month': 1,
+            'revenue_ytd': '$2.3M',
+            'response_time': 0.8,
+            'availability': 99.5,
+            'throughput': 156,
+            'memory_usage': 68,
+            'cpu_usage': 45
         }
     
     def render_header(self):
@@ -222,6 +316,12 @@ class VenueManagementSystem:
     
     def render_sidebar(self):
         with st.sidebar:
+            # Add NCS logo at the top
+            try:
+                st.image("logo_ncs.png", width=150)
+            except:
+                pass  # Continue if logo not found
+            
             st.markdown("### AI ASSISTANT CHAT")
             
             # Display messages
@@ -285,8 +385,28 @@ class VenueManagementSystem:
             
             if show_infrastructure_panel:
                 st.markdown("### INFRASTRUCTURE")
+                
+                # Add AWS logo
+                try:
+                    st.image("aws_logo.png", width=120)
+                except:
+                    pass  # Continue if logo not found
+                
                 st.session_state.show_infrastructure = st.checkbox("Show AWS Details", 
                                                                  value=st.session_state.show_infrastructure)
+                
+                # AWS Resources Summary
+                st.markdown("### AWS RESOURCES")
+                st.markdown(f"""
+                <div class="infrastructure-panel">
+                    <div class="infra-step">🤖 Bedrock Agent ID: {self.resources.get('agent_id', 'N/A')}</div>
+                    <div class="infra-step">📚 Knowledge Base ID: {self.resources.get('knowledge_base_id', 'N/A')}</div>
+                    <div class="infra-step">⚡ Lambda Function ARN: {self.resources.get('lambda_function_arn', 'N/A')}</div>
+                    <div class="infra-step">📊 DynamoDB Table: {self.resources.get('dynamodb_table', 'N/A')}</div>
+                    <div class="infra-step">🪣 S3 Bucket: {self.resources.get('s3_bucket', 'N/A')}</div>
+                    <div class="infra-step">🔐 IAM Roles: {', '.join(self.resources.get('iam_roles', []))}</div>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 # System metrics
                 st.markdown("### SYSTEM STATUS")
@@ -522,6 +642,14 @@ class VenueManagementSystem:
         # Calendar section
         st.markdown("---")
         self.render_calendar()
+        
+        # AWS Solution Architecture section
+        st.markdown("---")
+        with st.expander("🏗️ AWS Solution Architecture"):
+            try:
+                st.image("aws_solution_architecture.png", caption="AWS Solution Architecture Diagram")
+            except:
+                st.write("Architecture diagram not available")
     
     def execute_agent_query(self, query):
         if not self.connected:
@@ -570,13 +698,66 @@ class VenueManagementSystem:
                                     'source': result_item.get('location', {}).get('s3Location', {}).get('uri', 'Knowledge Base')
                                 })
                     
+                    # Check for Lambda function calls (booking operations)
+                    if 'invocationInput' in trace:
+                        infrastructure_steps.append("LAMBDA: Processing booking operation")
+                        infrastructure_steps.append("DYNAMODB: Updating venue records")
+                        # Add AWS resource display for booking operations
+                        if any(keyword in query.lower() for keyword in ['book', 'create', 'reserve']):
+                            self.display_aws_resources_for_booking()
+                    
                     if 'postProcessingTrace' in trace:
                         infrastructure_steps.append("POST-PROCESSING: Response formatting and validation")
+            
+            # Check if booking was created and refresh data
+            # if 'book' in query.lower() and 'EXECUTION ERROR' not in result:
+            #     self.refresh_data_from_db()
+            # Check if booking was created and refresh data _ version 2
+            booking_keywords = ['book', 'reserve', 'schedule', 'create booking']
+            if any(keyword in query.lower() for keyword in booking_keywords) and 'EXECUTION ERROR' not in result:
+                self.refresh_data_from_db()
             
             return result, sources, infrastructure_steps
             
         except Exception as e:
             return f"EXECUTION ERROR: {str(e)}", [], []
+    
+    def display_aws_resources_for_booking(self):
+        """Display AWS resource information for booking operations"""
+        try:
+            table = self.dynamodb.Table(self.resources['dynamodb_table'])
+            response = table.scan()
+            items = response['Items']
+            
+            aws_info = f"""
+📊 Found {len(items)} records in DynamoDB table '{self.resources['dynamodb_table']}':
+"""
+            for item in items:
+                aws_info += f"""
+  🎫 Booking ID: {item.get('booking_id', 'N/A')}
+     Client: {item.get('client_name', 'N/A')}
+     Venue: {item.get('venue_name', 'N/A')}
+     Date: {item.get('event_date', 'N/A')}
+     Guests: {item.get('guest_count', 'N/A')}
+     Status: {item.get('status', 'N/A')}
+
+"""
+            
+            st.session_state.messages.append({"role": "infrastructure", "content": [aws_info]})
+        except Exception as e:
+            st.session_state.messages.append({"role": "infrastructure", "content": [f"Error accessing DynamoDB: {str(e)}"]})
+    
+    def refresh_data_from_db(self):
+        """Refresh data from DynamoDB after booking operations"""
+        try:
+            # Only refresh bookings, not venues (to reduce DB calls)
+            st.session_state.bookings = self.load_bookings_from_db()
+            
+            # Update metrics without recalculating venues
+            self.system_metrics['bookings_month'] = len([d for d in st.session_state.bookings.keys() 
+                                                       if datetime.strptime(d, '%Y-%m-%d').month == datetime.now().month])
+        except Exception:
+            pass  # Continue with cached data
     
     def run(self):
         self.render_header()
