@@ -458,8 +458,147 @@ class VenueManagementSystem:
                     </div>
                     """, unsafe_allow_html=True)
     
+    def render_calendar_option1_native(self):
+        """Option 1: Streamlit Native Date Input (Recommended)"""
+        st.markdown("### 📅 BOOKING CALENDAR - Native Date Picker")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            selected_date = st.date_input(
+                "Select Date",
+                value=datetime.now().date(),
+                min_value=datetime.now().date(),
+                max_value=datetime.now().date() + timedelta(days=365)
+            )
+            
+            date_str = selected_date.strftime('%Y-%m-%d')
+            is_booked = date_str in st.session_state.bookings
+            
+            st.markdown("---")
+            
+            if is_booked:
+                st.error(f"🔴 **Booked**: {st.session_state.bookings[date_str]}")
+            else:
+                st.success("🟢 **Available** for booking")
+                
+            # Store selected date
+            st.session_state.selected_date = date_str
+    
+    def render_calendar_option2_cards(self):
+        """Option 2: Modern Card-Based Monthly View"""
+        st.markdown("### 📅 BOOKING CALENDAR - Card View")
+        
+        # Month selector
+        current_date = datetime.now()
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            selected_month = st.selectbox("Month", range(1, 13), 
+                                         index=current_date.month-1,
+                                         format_func=lambda x: calendar.month_name[x],
+                                         key="card_month")
+        
+        # Generate calendar as responsive cards
+        cal = calendar.monthcalendar(current_date.year, selected_month)
+        
+        # Days header
+        days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        cols = st.columns(7)
+        for i, day in enumerate(days):
+            with cols[i]:
+                st.markdown(f"**{day}**")
+        
+        # Calendar grid
+        for week in cal:
+            cols = st.columns(7)
+            for i, day in enumerate(week):
+                with cols[i]:
+                    if day != 0:
+                        date_str = f"{current_date.year}-{selected_month:02d}-{day:02d}"
+                        is_booked = date_str in st.session_state.bookings
+                        
+                        button_type = "primary" if is_booked else "secondary"
+                        if st.button(f"{day}", key=f"card_{date_str}", type=button_type, use_container_width=True):
+                            st.session_state.selected_date = date_str
+                            st.rerun()
+        
+        # Selected date info
+        if hasattr(st.session_state, 'selected_date') and st.session_state.selected_date:
+            date_str = st.session_state.selected_date
+            is_booked = date_str in st.session_state.bookings
+            
+            if is_booked:
+                st.error(f"🔴 **Selected**: {date_str} - {st.session_state.bookings[date_str]}")
+            else:
+                st.success(f"🟢 **Selected**: {date_str} - Available for booking")
+    
+    def render_calendar_option3_table(self):
+        """Option 3: Table-Based Calendar (AgGrid Alternative)"""
+        st.markdown("### 📅 BOOKING CALENDAR - Table View")
+        
+        # Create calendar data
+        dates = [datetime.now() + timedelta(days=x) for x in range(30)]
+        calendar_data = []
+        
+        for date in dates:
+            date_str = date.strftime('%Y-%m-%d')
+            is_booked = date_str in st.session_state.bookings
+            calendar_data.append({
+                'Date': date.strftime('%Y-%m-%d'),
+                'Day': date.strftime('%A'),
+                'Status': '🔴 Booked' if is_booked else '🟢 Available',
+                'Details': st.session_state.bookings.get(date_str, 'Available for booking')
+            })
+        
+        # Display as interactive table
+        import pandas as pd
+        df = pd.DataFrame(calendar_data)
+        
+        # Add selection
+        selected_rows = st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row"
+        )
+        
+        # Handle selection
+        if selected_rows.selection.rows:
+            selected_idx = selected_rows.selection.rows[0]
+            selected_date = df.iloc[selected_idx]['Date']
+            st.session_state.selected_date = selected_date
+            
+            is_booked = selected_date in st.session_state.bookings
+            if is_booked:
+                st.error(f"🔴 **Selected**: {selected_date} - {st.session_state.bookings[selected_date]}")
+            else:
+                st.success(f"🟢 **Selected**: {selected_date} - Available for booking")
+    
     def render_calendar(self):
-        st.markdown("### 📅 BOOKING CALENDAR")
+        """Main calendar render with options selector"""
+        st.markdown("### 📅 CALENDAR OPTIONS")
+        
+        # Calendar method selector
+        calendar_option = st.radio(
+            "Choose Calendar Style:",
+            ["Native Date Picker", "Card View", "Table View", "Original HTML/CSS"],
+            horizontal=True
+        )
+        
+        st.markdown("---")
+        
+        if calendar_option == "Native Date Picker":
+            self.render_calendar_option1_native()
+        elif calendar_option == "Card View":
+            self.render_calendar_option2_cards()
+        elif calendar_option == "Table View":
+            self.render_calendar_option3_table()
+        else:
+            self.render_calendar_original()
+    
+    def render_calendar_original(self):
+        """Original HTML/CSS Calendar Implementation"""
+        st.markdown("### 📅 BOOKING CALENDAR - Original")
         
         # Calendar controls
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -469,10 +608,12 @@ class VenueManagementSystem:
             selected_month = st.selectbox("📅 Month", 
                                         options=list(range(1, 13)),
                                         index=current_date.month - 1,
-                                        format_func=lambda x: calendar.month_name[x])
+                                        format_func=lambda x: calendar.month_name[x],
+                                        key="orig_month")
             selected_year = st.selectbox("📆 Year", 
                                        options=[2024, 2025, 2026],
-                                       index=1)
+                                       index=1,
+                                       key="orig_year")
         
         # Generate calendar
         cal = calendar.monthcalendar(selected_year, selected_month)
@@ -549,7 +690,7 @@ class VenueManagementSystem:
                         """, unsafe_allow_html=True)
                         
                         # Hidden button for functionality
-                        if st.button(" ", key=f"cal_{date_str}", help=f"Select {date_str}"):
+                        if st.button(" ", key=f"orig_{date_str}", help=f"Select {date_str}"):
                             st.session_state.selected_date = date_str
         
         # Selected date info
