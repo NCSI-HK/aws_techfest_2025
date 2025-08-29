@@ -105,7 +105,7 @@ st.markdown("""
     }
     
     /* Calendar button styling */
-    div[data-testid*="cal_"] button {
+    .stButton > button {
         width: 100% !important;
         height: 80px !important;
         padding: 0 !important;
@@ -117,12 +117,21 @@ st.markdown("""
         top: 0 !important;
         left: 0 !important;
         z-index: 10 !important;
+        min-height: 80px !important;
     }
     
     .calendar-cell {
         position: relative !important;
         width: 100% !important;
         height: 80px !important;
+    }
+    
+    .calendar-cell .stButton {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -212,10 +221,10 @@ class VenueManagementSystem:
             self.init_default_data()
     
     @st.cache_data(ttl=300)  # Cache for 5 minutes
-    def load_venues_from_db(self):
+    def load_venues_from_db(_self):
         """Load venues from DynamoDB with caching"""
         try:
-            table = self.dynamodb.Table('venue_management_venues')
+            table = _self.dynamodb.Table('venue_management_venues')
             response = table.scan()
             
             if response['Items']:
@@ -235,14 +244,14 @@ class VenueManagementSystem:
                 return default_venues
                 
         except Exception:
-            return self.get_default_venues()
+            return _self.get_default_venues()
     
     @st.cache_data(ttl=60)  # Cache for 1 minute
-    def load_bookings_from_db(self):
+    def load_bookings_from_db(_self):
         """Load bookings from actual agent DynamoDB table with caching"""
         try:
             # Use the actual agent table from resources
-            table = self.dynamodb.Table(self.resources['dynamodb_table'])
+            table = _self.dynamodb.Table(_self.resources['dynamodb_table'])
             response = table.scan()
             
             bookings = {}
@@ -258,10 +267,10 @@ class VenueManagementSystem:
             return {'2025-03-05': 'Conference Room A - ABC Corp Meeting'}
     
     @st.cache_data(ttl=300)  # Cache for 5 minutes
-    def load_revenue_from_db(self):
+    def load_revenue_from_db(_self):
         """Load revenue data from DynamoDB with caching"""
         try:
-            table = self.dynamodb.Table('venue_management_revenue')
+            table = _self.dynamodb.Table('venue_management_revenue')
             response = table.scan()
             
             if response['Items']:
