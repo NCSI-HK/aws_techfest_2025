@@ -153,13 +153,13 @@ class VenueManagementSystem:
         try:
             # Use Streamlit secrets for AWS credentials
             os.environ.update({
-                'AWS_ACCESS_KEY_ID': st.secrets['aws']['access_key_id'],
-                'AWS_SECRET_ACCESS_KEY': st.secrets['aws']['secret_access_key'],
-                'AWS_DEFAULT_REGION': st.secrets['aws']['region']
+                'AWS_ACCESS_KEY_ID': st.secrets['aws']['access_key_id'].strip(),
+                'AWS_SECRET_ACCESS_KEY': st.secrets['aws']['secret_access_key'].strip(),
+                'AWS_DEFAULT_REGION': st.secrets['aws']['region'].strip()
             })
             
-            self.bedrock = boto3.client('bedrock-agent-runtime', region_name=st.secrets['aws']['region'])
-            self.dynamodb = boto3.resource('dynamodb', region_name=st.secrets['aws']['region'])
+            self.bedrock = boto3.client('bedrock-agent-runtime')
+            self.dynamodb = boto3.resource('dynamodb')
             
             with open('created_resources_v4.json') as f:
                 resources = json.load(f)
