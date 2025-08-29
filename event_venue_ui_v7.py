@@ -104,34 +104,41 @@ st.markdown("""
         border: 1px solid #e9ecef;
     }
     
-    /* Calendar button styling - only for original calendar */
-    .calendar-cell + div .stButton > button {
-        width: 100% !important;
-        height: 80px !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        border: none !important;
-        background: transparent !important;
-        color: transparent !important;
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        z-index: 10 !important;
-        min-height: 80px !important;
-    }
-    
+    /* Calendar button styling - responsive for HTML version */
     .calendar-cell {
         position: relative !important;
         width: 100% !important;
         height: 80px !important;
+        min-height: 80px !important;
     }
     
-    .calendar-cell + div {
+    @media (max-width: 768px) {
+        .calendar-cell {
+            height: 60px !important;
+            min-height: 60px !important;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .calendar-cell {
+            height: 50px !important;
+            min-height: 50px !important;
+        }
+    }
+    
+    /* Button overlay for calendar cells */
+    .calendar-cell ~ div .stButton > button {
         position: absolute !important;
         top: 0 !important;
         left: 0 !important;
         width: 100% !important;
         height: 100% !important;
+        background: transparent !important;
+        border: none !important;
+        color: transparent !important;
+        z-index: 10 !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -582,18 +589,18 @@ class VenueManagementSystem:
         # Calendar method selector
         calendar_option = st.radio(
             "Choose Calendar Style:",
-            ["Native Date Picker", "Card View", "Table View", "Original HTML/CSS"],
+            ["Card View", "Table View", "Date Picker", "HTML/CSS"],
             horizontal=True
         )
         
         st.markdown("---")
         
-        if calendar_option == "Native Date Picker":
-            self.render_calendar_option1_native()
-        elif calendar_option == "Card View":
+        if calendar_option == "Card View":
             self.render_calendar_option2_cards()
         elif calendar_option == "Table View":
             self.render_calendar_option3_table()
+        elif calendar_option == "Date Picker":
+            self.render_calendar_option1_native()
         else:
             self.render_calendar_original()
     
@@ -674,6 +681,7 @@ class VenueManagementSystem:
                         st.markdown(f"""
                         <div class="calendar-cell" style="
                             height: 80px;
+                            min-height: 80px;
                             border: 1px solid #e2e8f0;
                             background: {cell_color};
                             color: {text_color};
@@ -685,8 +693,8 @@ class VenueManagementSystem:
                             transition: all 0.2s;
                             position: relative;
                         ">
-                            <div style="font-size: 1.2rem; font-weight: 600; margin-bottom: 4px;">{day}</div>
-                            {f'<div style="font-size: 0.6rem; text-align: center; opacity: 0.9;">📅 {st.session_state.bookings[date_str].split(" - ")[0][:8]}</div>' if is_booked else ''}
+                            <div style="font-size: clamp(0.9rem, 2vw, 1.2rem); font-weight: 600; margin-bottom: 2px;">{day}</div>
+                            {f'<div style="font-size: clamp(0.5rem, 1.5vw, 0.6rem); text-align: center; opacity: 0.9;">📅 {st.session_state.bookings[date_str].split(" - ")[0][:8]}</div>' if is_booked else ''}
                         </div>
                         """, unsafe_allow_html=True)
                         
