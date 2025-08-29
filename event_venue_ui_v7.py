@@ -114,8 +114,7 @@ class VenueManagementSystem:
     
     def setup_aws(self):
         try:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            with open(os.path.join(script_dir, 'config.yaml')) as f:
+            with open('config.yaml') as f:
                 config = yaml.safe_load(f)
             
             os.environ.update({
@@ -127,7 +126,7 @@ class VenueManagementSystem:
             self.bedrock = boto3.client('bedrock-agent-runtime', region_name=config['aws']['region'])
             self.dynamodb = boto3.resource('dynamodb', region_name=config['aws']['region'])
             
-            with open(os.path.join(script_dir, 'created_resources_v4.json')) as f:
+            with open('created_resources_v4.json') as f:
                 resources = json.load(f)
             self.agent_id = resources['agent_id']
             self.table_name = resources.get('dynamodb_table')
