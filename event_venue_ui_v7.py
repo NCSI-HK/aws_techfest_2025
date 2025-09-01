@@ -359,6 +359,40 @@ class VenueManagementSystem:
             except:
                 pass  # Continue if logo not found
             
+            # Menu section
+            st.markdown("### 🏢 EVENT MANAGEMENT MODULES")
+            
+            # Initialize selected module in session state
+            if 'selected_module' not in st.session_state:
+                st.session_state.selected_module = "Room/Venue Booking"
+            
+            # Module selection
+            modules = [
+                "Room/Venue Booking",
+                "Email Notification", 
+                "Food & Beverage Arrangement",
+                "eDM/Online Marketing Management",
+                "Attendee Management"
+            ]
+            
+            selected_module = st.selectbox(
+                "Select Module:",
+                modules,
+                index=modules.index(st.session_state.selected_module)
+            )
+            
+            # Update session state
+            if selected_module != st.session_state.selected_module:
+                st.session_state.selected_module = selected_module
+                st.rerun()
+            
+            # Show current module status
+            if selected_module == "Room/Venue Booking":
+                st.success("🟢 **Active Demo** - Full functionality")
+            else:
+                st.info("🔵 **Coming Soon** - Module in development")
+            
+            st.markdown("---")
             st.markdown("### AI ASSISTANT CHAT")
             
             # Display messages
